@@ -1,0 +1,367 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum CoupleMemberRole {
+  OWNER
+  MEMBER
+}
+
+enum CoupleInviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum IncomeType {
+  SALARY
+  EXTRA
+}
+
+enum ExpenseOwnership {
+  SHARED
+  INDIVIDUAL
+}
+
+enum ExpenseStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum RecurringFrequency {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  ACHIEVED
+  CANCELLED
+}
+
+enum NotificationType {
+  GOAL_OVERDUE
+  GOAL_ACHIEVED
+  RECURRING_EXPENSE_DUE
+  REMINDER
+}
+
+// ============================================================
+// Auth / Users
+// ============================================================
+
+model User {
+  id              String    @id @default(uuid())
+  name            String
+  email           String    @unique
+  passwordHash    String
+  emailVerifiedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  coupleMember             CoupleMember?
+  sentInvites              CoupleInvite[]           @relation("InviteSender")
+  incomes                  Income[]
+  createdExpenses          Expense[]                @relation("ExpenseCreatedBy")
+  ownedExpenses            Expense[]                @relation("ExpenseOwner")
+  createdRecurringExpenses RecurringExpense[]       @relation("RecurringExpenseOwner")
+  goalContributionSplits   GoalContributionSplit[]
+  goalContributions        GoalContribution[]
+  notifications            Notification[]
+  refreshTokens            RefreshToken[]
+  passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+// ============================================================
+// Couples
+// ============================================================
+
+model Couple {
+  id        String   @id @default(uuid())
+  name      String?
+  createdAt DateTime @default(now())
+
+  members           CoupleMember[]
+  invites           CoupleInvite[]
+  incomes           Income[]
+  expenseCategories ExpenseCategory[]
+  expenses          Expense[]
+  recurringExpenses RecurringExpense[]
+  financialGoals    FinancialGoal[]
+
+  @@map("couples")
+}
+
+// Cada usuário pertence a no máximo um casal ativo (userId é único).
+// Um Couple é criado já no envio do primeiro convite, com o remetente
+// como único membro (role OWNER); o convidado entra como MEMBER ao aceitar.
+model CoupleMember {
+  id       String           @id @default(uuid())
+  coupleId String
+  couple   Couple           @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  userId   String           @unique
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     CoupleMemberRole @default(MEMBER)
+  joinedAt DateTime         @default(now())
+
+  @@index([coupleId])
+  @@map("couple_members")
+}
+
+model CoupleInvite {
+  id            String             @id @default(uuid())
+  coupleId      String
+  couple        Couple             @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  inviterUserId String
+  inviterUser   User               @relation("InviteSender", fields: [inviterUserId], references: [id], onDelete: Cascade)
+  inviteeEmail  String
+  status        CoupleInviteStatus @default(PENDING)
+  token         String             @unique
+  expiresAt     DateTime
+  createdAt     DateTime           @default(now())
+
+  @@index([coupleId])
+  @@index([inviteeEmail])
+  @@map("couple_invites")
+}
+
+// ============================================================
+// Incomes
+// ============================================================
+
+model Income {
+  id             String     @id @default(uuid())
+  coupleId       String
+  couple         Couple     @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           IncomeType
+  description    String
+  amount         Decimal    @db.Decimal(12, 2)
+  referenceMonth DateTime   @db.Date
+  receivedAt     DateTime   @db.Date
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([coupleId, referenceMonth])
+  @@index([userId])
+  @@map("incomes")
+}
+
+// ============================================================
+// Expenses
+// ============================================================
+
+// coupleId nulo = categoria padrão/global do sistema (seed), visível a todos os casais.
+model ExpenseCategory {
+  id       String  @id @default(uuid())
+  coupleId String?
+  couple   Couple? @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  name     String
+  icon     String?
+  color    String?
+
+  expenses          Expense[]
+  recurringExpenses RecurringExpense[]
+
+  @@unique([coupleId, name])
+  @@index([coupleId])
+  @@map("expense_categories")
+}
+
+// Molde para despesas recorrentes; um job mensal gera registros Expense
+// (isRecurring = true, recurringExpenseId apontando para este registro).
+model RecurringExpense {
+  id                     String             @id @default(uuid())
+  coupleId               String
+  couple                 Couple             @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  templateDescription    String
+  amount                 Decimal            @db.Decimal(12, 2)
+  categoryId             String
+  category               ExpenseCategory    @relation(fields: [categoryId], references: [id])
+  ownership              ExpenseOwnership
+  ownerUserId            String?
+  ownerUser              User?              @relation("RecurringExpenseOwner", fields: [ownerUserId], references: [id])
+  // Percentual de rateio para despesas SHARED. A/B seguem a ordem de
+  // entrada dos CoupleMember no casal (A = primeiro a entrar, B = segundo).
+  sharedSplitPercentageA Decimal?           @db.Decimal(5, 2)
+  sharedSplitPercentageB Decimal?           @db.Decimal(5, 2)
+  frequency              RecurringFrequency
+  dayOfMonth             Int?
+  startDate              DateTime           @db.Date
+  endDate                DateTime?          @db.Date
+  active                 Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  expenses Expense[]
+
+  @@index([coupleId])
+  @@map("recurring_expenses")
+}
+
+model Expense {
+  id                     String           @id @default(uuid())
+  coupleId               String
+  couple                 Couple           @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  createdByUserId        String
+  createdByUser          User             @relation("ExpenseCreatedBy", fields: [createdByUserId], references: [id])
+  categoryId             String
+  category               ExpenseCategory  @relation(fields: [categoryId], references: [id])
+  description            String
+  amount                 Decimal          @db.Decimal(12, 2)
+  ownership              ExpenseOwnership
+  ownerUserId            String?
+  ownerUser              User?            @relation("ExpenseOwner", fields: [ownerUserId], references: [id])
+  // Percentual de rateio para despesas SHARED (ver convenção A/B em RecurringExpense).
+  sharedSplitPercentageA Decimal?         @db.Decimal(5, 2)
+  sharedSplitPercentageB Decimal?         @db.Decimal(5, 2)
+  dueDate                DateTime         @db.Date
+  paidAt                 DateTime?        @db.Date
+  status                 ExpenseStatus    @default(PENDING)
+
+  isRecurring        Boolean           @default(false)
+  recurringExpenseId String?
+  recurringExpense   RecurringExpense? @relation(fields: [recurringExpenseId], references: [id])
+
+  // Parcelas: cada parcela é um Expense próprio, ligado à "despesa mãe"
+  // via installmentParentId, com installmentNumber/installmentTotal (ex: 3/12).
+  isInstallment       Boolean   @default(false)
+  installmentParentId String?
+  installmentParent   Expense?  @relation("InstallmentGroup", fields: [installmentParentId], references: [id])
+  installments        Expense[] @relation("InstallmentGroup")
+  installmentNumber   Int?
+  installmentTotal    Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([coupleId, dueDate])
+  @@index([categoryId])
+  @@index([recurringExpenseId])
+  @@index([installmentParentId])
+  @@map("expenses")
+}
+
+// ============================================================
+// Financial Goals
+// ============================================================
+
+model FinancialGoal {
+  id           String     @id @default(uuid())
+  coupleId     String
+  couple       Couple     @relation(fields: [coupleId], references: [id], onDelete: Cascade)
+  title        String
+  targetAmount Decimal    @db.Decimal(12, 2)
+  targetDate   DateTime   @db.Date
+  status       GoalStatus @default(IN_PROGRESS)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  splits        GoalContributionSplit[]
+  contributions GoalContribution[]
+
+  @@index([coupleId])
+  @@map("financial_goals")
+}
+
+// A soma de percentage por goalId deve ser 100% — validado no GoalService.
+model GoalContributionSplit {
+  id         String        @id @default(uuid())
+  goalId     String
+  goal       FinancialGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  percentage Decimal       @db.Decimal(5, 2)
+
+  @@unique([goalId, userId])
+  @@map("goal_contribution_splits")
+}
+
+model GoalContribution {
+  id            String        @id @default(uuid())
+  goalId        String
+  goal          FinancialGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount        Decimal       @db.Decimal(12, 2)
+  contributedAt DateTime      @db.Date
+  createdAt     DateTime      @default(now())
+
+  @@index([goalId])
+  @@index([userId])
+  @@map("goal_contributions")
+}
+
+// ============================================================
+// Notifications
+// ============================================================
+
+model Notification {
+  id              String           @id @default(uuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            NotificationType
+  title           String
+  message         String
+  relatedEntityId String?
+  readAt          DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@index([userId, readAt])
+  @@map("notifications")
+}

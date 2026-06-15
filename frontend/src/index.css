@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Serif editorial usada em títulos e números de destaque (ex: detalhe de meta) */
+  --font-display: 'Fraunces', 'Georgia', serif;
+
+  /* Paleta neutra (base) */
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #2563eb;
+
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+
+  /* Cor primária: azul (confiança/estabilidade) */
+  --color-primary: #2563eb;
+  --color-primary-foreground: #f8fafc;
+
+  --color-secondary: #f1f5f9;
+  --color-secondary-foreground: #0f172a;
+
+  --color-accent: #f1f5f9;
+  --color-accent-foreground: #0f172a;
+
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #f8fafc;
+
+  /* Cores semânticas financeiras */
+  --color-income: #16a34a;
+  --color-income-foreground: #f0fdf4;
+  --color-expense: #dc2626;
+  --color-expense-foreground: #fef2f2;
+  --color-goal: #7c3aed;
+  --color-goal-foreground: #f5f3ff;
+
+  /* Sidebar de navegação (tema escuro sobre a paleta primária) */
+  --color-sidebar: #0f172a;
+  --color-sidebar-foreground: #e2e8f0;
+  --color-sidebar-border: #1e293b;
+  --color-sidebar-accent: #1e293b;
+  --color-sidebar-accent-foreground: #f8fafc;
+
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Entrada suave e escalonada usada na página de detalhe de meta */
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
