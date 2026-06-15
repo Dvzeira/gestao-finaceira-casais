@@ -35,7 +35,6 @@ export function RegisterForm() {
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -50,20 +49,10 @@ export function RegisterForm() {
         email: values.email,
         password: values.password,
       });
-      setSuccess(true);
-      setTimeout(() => void navigate('/login', { replace: true }), 2000);
+      void navigate('/', { replace: true });
     } catch (error) {
       setSubmitError(getApiErrorMessage(error));
     }
-  }
-
-  if (success) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Conta criada com sucesso! Verifique seu e-mail para confirmar o
-        cadastro. Você será redirecionado para o login.
-      </p>
-    );
   }
 
   return (

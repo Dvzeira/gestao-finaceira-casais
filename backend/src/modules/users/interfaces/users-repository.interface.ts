@@ -6,7 +6,6 @@ export interface UserEntity {
   name: string;
   email: string;
   passwordHash: string;
-  emailVerifiedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,5 +23,4 @@ export interface IUsersRepository {
   findById(id: string): Promise<UserEntity | null>;
   create(data: CreateUserData): Promise<UserEntity>;
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
-  markEmailVerified(userId: string): Promise<void>;
 }

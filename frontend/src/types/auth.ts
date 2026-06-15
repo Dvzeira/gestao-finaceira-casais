@@ -11,12 +11,6 @@ export interface RegisterPayload {
   password: string;
 }
 
-export interface RegisterResponse {
-  id: string;
-  name: string;
-  email: string;
-}
-
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;

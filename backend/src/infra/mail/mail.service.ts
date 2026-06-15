@@ -38,22 +38,6 @@ export class MailService {
     });
   }
 
-  async sendEmailConfirmation(
-    to: string,
-    confirmationUrl: string,
-  ): Promise<void> {
-    await this.sendEmail({
-      to,
-      subject: 'Confirme seu e-mail',
-      html: `
-        <p>Olá!</p>
-        <p>Confirme seu e-mail para ativar sua conta na Gestão Financeira para Casais:</p>
-        <p><a href="${confirmationUrl}">${confirmationUrl}</a></p>
-        <p>Se você não criou esta conta, ignore este e-mail.</p>
-      `,
-    });
-  }
-
   async sendPasswordReset(to: string, resetUrl: string): Promise<void> {
     await this.sendEmail({
       to,

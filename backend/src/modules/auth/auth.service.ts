@@ -11,8 +11,6 @@ import { JwtService } from '@nestjs/jwt';
 import { MailService } from '../../infra/mail/mail.service';
 import { USERS_REPOSITORY } from '../users/interfaces/users-repository.interface';
 import type { IUsersRepository } from '../users/interfaces/users-repository.interface';
-import { EMAIL_VERIFICATION_TOKEN_REPOSITORY } from './interfaces/email-verification-token-repository.interface';
-import type { IEmailVerificationTokenRepository } from './interfaces/email-verification-token-repository.interface';
 import { PASSWORD_RESET_TOKEN_REPOSITORY } from './interfaces/password-reset-token-repository.interface';
 import type { IPasswordResetTokenRepository } from './interfaces/password-reset-token-repository.interface';
 import { REFRESH_TOKEN_REPOSITORY } from './interfaces/refresh-token-repository.interface';
@@ -21,19 +19,12 @@ import { PasswordService } from './services/password.service';
 import { TokenService } from '../../shared/services/token.service';
 import { JwtDuration } from '../../shared/types/jwt-duration.type';
 
-const EMAIL_VERIFICATION_TOKEN_TTL_HOURS = 24;
 const PASSWORD_RESET_TOKEN_TTL_HOURS = 1;
 
 export interface RegisterData {
   name: string;
   email: string;
   password: string;
-}
-
-export interface RegisteredUser {
-  id: string;
-  name: string;
-  email: string;
 }
 
 export interface LoginData {
@@ -57,8 +48,6 @@ export class AuthService {
   constructor(
     @Inject(USERS_REPOSITORY)
     private readonly usersRepository: IUsersRepository,
-    @Inject(EMAIL_VERIFICATION_TOKEN_REPOSITORY)
-    private readonly emailVerificationTokenRepository: IEmailVerificationTokenRepository,
     @Inject(REFRESH_TOKEN_REPOSITORY)
     private readonly refreshTokenRepository: IRefreshTokenRepository,
     @Inject(PASSWORD_RESET_TOKEN_REPOSITORY)
@@ -70,9 +59,9 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {}
 
-  // Cria o usuário com senha hasheada, gera um token de confirmação de e-mail
-  // (armazenado como hash) e envia o link de confirmação por e-mail.
-  async register(data: RegisterData): Promise<RegisteredUser> {
+  // Cria o usuário com senha hasheada e já emite o par de tokens (access +
+  // refresh), permitindo que o cliente entre direto no sistema após o cadastro.
+  async register(data: RegisterData): Promise<AuthTokens> {
     const existingUser = await this.usersRepository.findByEmail(data.email);
     if (existingUser) {
       throw new ConflictException('Já existe uma conta com este e-mail.');
@@ -85,61 +74,7 @@ export class AuthService {
       passwordHash,
     });
 
-    // O envio do e-mail de confirmação é "best effort": o cadastro já foi
-    // persistido com sucesso e não deve falhar para o cliente por uma
-    // indisponibilidade do servidor de e-mail.
-    try {
-      await this.sendEmailVerification(user.id, user.email);
-    } catch (error) {
-      this.logger.warn(
-        `Falha ao enviar e-mail de confirmação para ${user.email}`,
-        error instanceof Error ? error.stack : error,
-      );
-    }
-
-    return { id: user.id, name: user.name, email: user.email };
-  }
-
-  private async sendEmailVerification(
-    userId: string,
-    email: string,
-  ): Promise<void> {
-    const rawToken = this.tokenService.generateRawToken();
-    const tokenHash = this.tokenService.hashToken(rawToken);
-    const expiresAt = new Date(
-      Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_HOURS * 60 * 60 * 1000,
-    );
-
-    await this.emailVerificationTokenRepository.create({
-      userId,
-      tokenHash,
-      expiresAt,
-    });
-
-    const frontendUrl = this.config.get<string>(
-      'FRONTEND_URL',
-      'http://localhost:5173',
-    );
-    const confirmationUrl = `${frontendUrl}/confirm-email?token=${rawToken}`;
-
-    await this.mailService.sendEmailConfirmation(email, confirmationUrl);
-  }
-
-  // Valida o token de confirmação (hash + expiração + uso único) e marca o
-  // e-mail do usuário como verificado.
-  async confirmEmail(rawToken: string): Promise<void> {
-    const tokenHash = this.tokenService.hashToken(rawToken);
-    const token =
-      await this.emailVerificationTokenRepository.findByTokenHash(tokenHash);
-
-    if (!token || token.usedAt || token.expiresAt < new Date()) {
-      throw new BadRequestException(
-        'Token de confirmação inválido ou expirado.',
-      );
-    }
-
-    await this.usersRepository.markEmailVerified(token.userId);
-    await this.emailVerificationTokenRepository.markUsed(token.id);
+    return this.issueTokens(user.id);
   }
 
   // Valida e-mail/senha e emite o par de tokens (access + refresh).

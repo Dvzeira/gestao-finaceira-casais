@@ -10,8 +10,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { PasswordService } from './services/password.service';
 import { TokenService } from '../../shared/services/token.service';
 import { JwtAuthGuard } from '../../shared/guards/jwt-auth.guard';
-import { EMAIL_VERIFICATION_TOKEN_REPOSITORY } from './interfaces/email-verification-token-repository.interface';
-import { EmailVerificationTokenRepository } from './repositories/email-verification-token.repository';
 import { PASSWORD_RESET_TOKEN_REPOSITORY } from './interfaces/password-reset-token-repository.interface';
 import { PasswordResetTokenRepository } from './repositories/password-reset-token.repository';
 import { REFRESH_TOKEN_REPOSITORY } from './interfaces/refresh-token-repository.interface';
@@ -39,10 +37,6 @@ import { JwtDuration } from '../../shared/types/jwt-duration.type';
     JwtStrategy,
     PasswordService,
     TokenService,
-    {
-      provide: EMAIL_VERIFICATION_TOKEN_REPOSITORY,
-      useClass: EmailVerificationTokenRepository,
-    },
     {
       provide: PASSWORD_RESET_TOKEN_REPOSITORY,
       useClass: PasswordResetTokenRepository,

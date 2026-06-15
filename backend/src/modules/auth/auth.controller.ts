@@ -2,13 +2,11 @@ import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { Public } from '../../shared/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { AuthTokensResponseDto } from './dto/auth-tokens-response.dto';
-import { ConfirmEmailDto } from './dto/confirm-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { MessageResponseDto } from './dto/message-response.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
-import { RegisterResponseDto } from './dto/register-response.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
@@ -17,18 +15,9 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  async register(@Body() dto: RegisterDto): Promise<RegisterResponseDto> {
-    return this.authService.register(dto);
-  }
-
-  @Public()
-  @Post('confirm-email')
   @HttpCode(HttpStatus.OK)
-  async confirmEmail(
-    @Body() dto: ConfirmEmailDto,
-  ): Promise<MessageResponseDto> {
-    await this.authService.confirmEmail(dto.token);
-    return { message: 'E-mail confirmado com sucesso.' };
+  async register(@Body() dto: RegisterDto): Promise<AuthTokensResponseDto> {
+    return this.authService.register(dto);
   }
 
   @Public()

@@ -63,26 +63,24 @@ enum NotificationType {
 // ============================================================
 
 model User {
-  id              String    @id @default(uuid())
-  name            String
-  email           String    @unique
-  passwordHash    String
-  emailVerifiedAt DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   coupleMember             CoupleMember?
-  sentInvites              CoupleInvite[]           @relation("InviteSender")
+  sentInvites              CoupleInvite[]          @relation("InviteSender")
   incomes                  Income[]
-  createdExpenses          Expense[]                @relation("ExpenseCreatedBy")
-  ownedExpenses            Expense[]                @relation("ExpenseOwner")
-  createdRecurringExpenses RecurringExpense[]       @relation("RecurringExpenseOwner")
+  createdExpenses          Expense[]               @relation("ExpenseCreatedBy")
+  ownedExpenses            Expense[]               @relation("ExpenseOwner")
+  createdRecurringExpenses RecurringExpense[]      @relation("RecurringExpenseOwner")
   goalContributionSplits   GoalContributionSplit[]
   goalContributions        GoalContribution[]
   notifications            Notification[]
   refreshTokens            RefreshToken[]
   passwordResetTokens      PasswordResetToken[]
-  emailVerificationTokens  EmailVerificationToken[]
 
   @@map("users")
 }
@@ -111,19 +109,6 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
-}
-
-model EmailVerificationToken {
-  id        String    @id @default(uuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  @@index([userId])
-  @@map("email_verification_tokens")
 }
 
 // ============================================================

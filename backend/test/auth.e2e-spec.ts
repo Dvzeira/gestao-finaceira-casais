@@ -10,7 +10,6 @@ describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   const mailService = {
-    sendEmailConfirmation: jest.fn().mockResolvedValue(undefined),
     sendPasswordReset: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -53,43 +52,36 @@ describe('Auth (e2e)', () => {
     return token;
   }
 
-  it('fluxo completo: registro -> confirmação -> login -> rota protegida -> refresh -> forgot/reset', async () => {
-    // 1. Registro
+  it('fluxo completo: registro -> rota protegida -> refresh -> forgot/reset', async () => {
+    // 1. Registro já retorna os tokens de acesso (login automático)
     const registerResponse = await request(app.getHttpServer())
       .post('/auth/register')
       .send({ name: 'Casal Teste', email, password })
-      .expect(201);
-
-    const registerBody = registerResponse.body as {
-      id: string;
-      name: string;
-      email: string;
-    };
-    expect(typeof registerBody.id).toBe('string');
-    expect(registerBody.name).toBe('Casal Teste');
-    expect(registerBody.email).toBe(email);
-    expect(mailService.sendEmailConfirmation).toHaveBeenCalledTimes(1);
-
-    // 2. Confirmação de e-mail
-    const [, confirmationUrl] = mailService.sendEmailConfirmation.mock
-      .calls[0] as [string, string];
-    await request(app.getHttpServer())
-      .post('/auth/confirm-email')
-      .send({ token: extractToken(confirmationUrl) })
       .expect(200);
 
-    // 3. Login
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password })
-      .expect(200);
-
-    const { accessToken, refreshToken } = loginResponse.body as {
+    const { accessToken, refreshToken } = registerResponse.body as {
       accessToken: string;
       refreshToken: string;
     };
     expect(accessToken).toBeDefined();
     expect(refreshToken).toBeDefined();
+
+    // 2. Registrar com o mesmo e-mail novamente deve falhar
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({ name: 'Casal Teste', email, password })
+      .expect(409);
+
+    // 3. Login com as credenciais recém-criadas
+    const loginResponse = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email, password })
+      .expect(200);
+
+    expect(loginResponse.body).toMatchObject({
+      accessToken: expect.any(String),
+      refreshToken: expect.any(String),
+    });
 
     // 4. Rota protegida com access token
     await request(app.getHttpServer())

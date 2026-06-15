@@ -31,11 +31,4 @@ export class UsersRepository implements IUsersRepository {
       data: { passwordHash },
     });
   }
-
-  async markEmailVerified(userId: string): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { emailVerifiedAt: new Date() },
-    });
-  }
 }

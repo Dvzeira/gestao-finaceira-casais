@@ -8,11 +8,7 @@ import {
 import { decodeJwtPayload } from '@/lib/jwt';
 import { clearTokens, getAccessToken, setTokens } from '@/lib/token-storage';
 import * as authApi from '@/features/auth/services/auth.api';
-import type {
-  LoginPayload,
-  RegisterPayload,
-  RegisterResponse,
-} from '@/types/auth';
+import type { LoginPayload, RegisterPayload } from '@/types/auth';
 
 interface AccessTokenPayload {
   sub: string;
@@ -22,7 +18,7 @@ export interface AuthContextValue {
   userId: string | null;
   isAuthenticated: boolean;
   login: (payload: LoginPayload) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<RegisterResponse>;
+  register: (payload: RegisterPayload) => Promise<void>;
   logout: () => void;
 }
 
@@ -46,10 +42,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserId(getUserIdFromToken(tokens.accessToken));
   }, []);
 
-  const register = useCallback(
-    (payload: RegisterPayload) => authApi.register(payload),
-    [],
-  );
+  const register = useCallback(async (payload: RegisterPayload) => {
+    const tokens = await authApi.register(payload);
+    setTokens(tokens);
+    setUserId(getUserIdFromToken(tokens.accessToken));
+  }, []);
 
   const logout = useCallback(() => {
     clearTokens();

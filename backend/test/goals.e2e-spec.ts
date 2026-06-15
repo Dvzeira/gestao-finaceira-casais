@@ -10,7 +10,6 @@ describe('Goals (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
   const mailService = {
-    sendEmailConfirmation: jest.fn().mockResolvedValue(undefined),
     sendPasswordReset: jest.fn().mockResolvedValue(undefined),
     sendCoupleInvite: jest.fn().mockResolvedValue(undefined),
   };
@@ -48,38 +47,16 @@ describe('Goals (e2e)', () => {
     await app.close();
   });
 
-  function extractConfirmationToken(confirmationUrl: string): string {
-    const url = new URL(confirmationUrl);
-    const token = url.searchParams.get('token');
-    if (!token) {
-      throw new Error('Token de confirmação não encontrado na URL');
-    }
-    return token;
-  }
-
   async function registerAndLogin(
     name: string,
     email: string,
   ): Promise<string> {
-    await request(app.getHttpServer())
+    const registerResponse = await request(app.getHttpServer())
       .post('/auth/register')
       .send({ name, email, password })
-      .expect(201);
-
-    const [, confirmationUrl] = mailService.sendEmailConfirmation.mock.calls[
-      mailService.sendEmailConfirmation.mock.calls.length - 1
-    ] as [string, string];
-    await request(app.getHttpServer())
-      .post('/auth/confirm-email')
-      .send({ token: extractConfirmationToken(confirmationUrl) })
       .expect(200);
 
-    const loginResponse = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password })
-      .expect(200);
-
-    const { accessToken } = loginResponse.body as { accessToken: string };
+    const { accessToken } = registerResponse.body as { accessToken: string };
     return accessToken;
   }
 

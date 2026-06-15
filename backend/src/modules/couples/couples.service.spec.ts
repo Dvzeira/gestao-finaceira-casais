@@ -29,7 +29,6 @@ function buildUser(overrides: Partial<UserEntity> = {}): UserEntity {
     name: 'Alice',
     email: 'alice@example.com',
     passwordHash: 'hashed-password',
-    emailVerifiedAt: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -81,7 +80,6 @@ describe('CouplesService', () => {
       findById: jest.fn(),
       create: jest.fn(),
       updatePasswordHash: jest.fn(),
-      markEmailVerified: jest.fn(),
     };
 
     coupleRepository = {

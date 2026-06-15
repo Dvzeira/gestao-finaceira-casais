@@ -10,7 +10,6 @@ import type {
   IUsersRepository,
   UserEntity,
 } from '../users/interfaces/users-repository.interface';
-import type { IEmailVerificationTokenRepository } from './interfaces/email-verification-token-repository.interface';
 import type { IPasswordResetTokenRepository } from './interfaces/password-reset-token-repository.interface';
 import type { IRefreshTokenRepository } from './interfaces/refresh-token-repository.interface';
 import { AuthService } from './auth.service';
@@ -23,7 +22,6 @@ function buildUser(overrides: Partial<UserEntity> = {}): UserEntity {
     name: 'Casal Teste',
     email: 'casal@example.com',
     passwordHash: 'hashed-password',
-    emailVerifiedAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -33,7 +31,6 @@ function buildUser(overrides: Partial<UserEntity> = {}): UserEntity {
 describe('AuthService', () => {
   let authService: AuthService;
   let usersRepository: jest.Mocked<IUsersRepository>;
-  let emailVerificationTokenRepository: jest.Mocked<IEmailVerificationTokenRepository>;
   let refreshTokenRepository: jest.Mocked<IRefreshTokenRepository>;
   let passwordResetTokenRepository: jest.Mocked<IPasswordResetTokenRepository>;
   let passwordService: jest.Mocked<PasswordService>;
@@ -48,13 +45,6 @@ describe('AuthService', () => {
       findById: jest.fn(),
       create: jest.fn(),
       updatePasswordHash: jest.fn(),
-      markEmailVerified: jest.fn(),
-    };
-
-    emailVerificationTokenRepository = {
-      create: jest.fn(),
-      findByTokenHash: jest.fn(),
-      markUsed: jest.fn(),
     };
 
     refreshTokenRepository = {
@@ -81,7 +71,6 @@ describe('AuthService', () => {
     };
 
     mailService = {
-      sendEmailConfirmation: jest.fn(),
       sendPasswordReset: jest.fn(),
     } as unknown as jest.Mocked<MailService>;
 
@@ -96,7 +85,6 @@ describe('AuthService', () => {
 
     authService = new AuthService(
       usersRepository,
-      emailVerificationTokenRepository,
       refreshTokenRepository,
       passwordResetTokenRepository,
       passwordService,
@@ -108,12 +96,15 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('cria o usuário, gera token de verificação e envia e-mail de confirmação', async () => {
+    it('cria o usuário e já retorna access e refresh tokens', async () => {
       usersRepository.findByEmail.mockResolvedValue(null);
       passwordService.hash.mockResolvedValue('hashed-password');
       usersRepository.create.mockResolvedValue(buildUser());
+      jwtService.signAsync
+        .mockResolvedValueOnce('access-token')
+        .mockResolvedValueOnce('refresh-token');
       tokenService.generateRawToken.mockReturnValue('raw-token');
-      tokenService.hashToken.mockReturnValue('hashed-token');
+      tokenService.hashToken.mockReturnValue('hashed-refresh-token');
 
       const result = await authService.register({
         name: 'Casal Teste',
@@ -122,24 +113,19 @@ describe('AuthService', () => {
       });
 
       expect(result).toEqual({
-        id: 'user-1',
-        name: 'Casal Teste',
-        email: 'casal@example.com',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
       });
       expect(usersRepository.create).toHaveBeenCalledWith({
         name: 'Casal Teste',
         email: 'casal@example.com',
         passwordHash: 'hashed-password',
       });
-      expect(emailVerificationTokenRepository.create).toHaveBeenCalledWith(
+      expect(refreshTokenRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-1',
-          tokenHash: 'hashed-token',
+          tokenHash: 'hashed-refresh-token',
         }),
-      );
-      expect(mailService.sendEmailConfirmation).toHaveBeenCalledWith(
-        'casal@example.com',
-        expect.stringContaining('raw-token'),
       );
     });
 
@@ -155,52 +141,6 @@ describe('AuthService', () => {
       ).rejects.toBeInstanceOf(ConflictException);
 
       expect(usersRepository.create).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('confirmEmail', () => {
-    it('marca o e-mail como verificado quando o token é válido', async () => {
-      tokenService.hashToken.mockReturnValue('hashed-token');
-      emailVerificationTokenRepository.findByTokenHash.mockResolvedValue({
-        id: 'token-1',
-        userId: 'user-1',
-        tokenHash: 'hashed-token',
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
-        usedAt: null,
-        createdAt: new Date(),
-      });
-
-      await authService.confirmEmail('raw-token');
-
-      expect(usersRepository.markEmailVerified).toHaveBeenCalledWith('user-1');
-      expect(emailVerificationTokenRepository.markUsed).toHaveBeenCalledWith(
-        'token-1',
-      );
-    });
-
-    it('lança BadRequestException quando o token não existe', async () => {
-      tokenService.hashToken.mockReturnValue('hashed-token');
-      emailVerificationTokenRepository.findByTokenHash.mockResolvedValue(null);
-
-      await expect(
-        authService.confirmEmail('raw-token'),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    });
-
-    it('lança BadRequestException quando o token está expirado', async () => {
-      tokenService.hashToken.mockReturnValue('hashed-token');
-      emailVerificationTokenRepository.findByTokenHash.mockResolvedValue({
-        id: 'token-1',
-        userId: 'user-1',
-        tokenHash: 'hashed-token',
-        expiresAt: new Date(Date.now() - 1000),
-        usedAt: null,
-        createdAt: new Date(),
-      });
-
-      await expect(
-        authService.confirmEmail('raw-token'),
-      ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
