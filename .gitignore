@@ -33,3 +33,8 @@ backend/prisma/dev.db
 
 # Misc
 *.tsbuildinfo
+
+# Arquivos de orientação para agentes de IA (uso local apenas)
+CLAUDE.md
+backend/CLAUDE.md
+frontend/CLAUDE.md

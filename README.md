@@ -39,12 +39,6 @@ financeira do casal.
 /frontend  -> SPA React (Vite + TailwindCSS + Shadcn UI)
 ```
 
-Cada parte do projeto possui seu próprio `CLAUDE.md` com os padrões arquiteturais e de desenvolvimento
-detalhados:
-
-- [`/backend/CLAUDE.md`](./backend/CLAUDE.md)
-- [`/frontend/CLAUDE.md`](./frontend/CLAUDE.md)
-
 ## Como rodar o projeto
 
 ### Pré-requisitos
