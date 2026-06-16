@@ -32,12 +32,94 @@ financeira do casal.
 
 - **Docker** / **Docker Compose** — orquestração dos containers de backend, frontend e banco de dados.
 
+## Arquitetura
+
+### Visão geral
+
+O projeto segue **Clean Architecture** em ambas as camadas, com separação clara entre regras de negócio,
+casos de uso, infraestrutura e apresentação. Os princípios **SOLID** guiam todas as decisões de design —
+em especial Single Responsibility e Dependency Inversion.
+
+### Backend — NestJS
+
+Cada domínio (Auth, Couples, Incomes, Expenses, Goals, Reports, etc.) é um **Module** NestJS com as
+seguintes camadas, sempre na mesma ordem de dependência:
+
+```
+Controller → Service → Repository → Prisma (banco de dados)
+                 ↑
+               DTOs (entrada e saída)
+```
+
+| Camada | Responsabilidade |
+|---|---|
+| **Controller** | Recebe a requisição HTTP, valida o DTO de entrada e delega ao Service. Sem regra de negócio. |
+| **Service** | Contém toda a regra de negócio do domínio. Depende apenas de interfaces de Repository (Dependency Inversion). |
+| **Repository** | Implementa a interface de persistência via Prisma. Apenas queries, sem lógica de negócio. |
+| **DTOs** | Toda entrada e saída usa DTOs explícitos com `class-validator`. Entidades Prisma nunca são retornadas "cruas". |
+
+Repositories são injetados nos Services via **token/interface** (ex: `EXPENSE_REPOSITORY`), permitindo
+substituição por mocks em testes sem alterar o Service.
+
+### Frontend — React
+
+A interface segue uma arquitetura orientada a **features**, com cada domínio isolado em sua própria pasta:
+
+```
+features/
+├── auth/
+├── couples/
+├── incomes/
+├── expenses/      ← ex: components/, hooks/, services/
+├── goals/
+├── dashboard/
+└── reports/
+```
+
+- **React Query** é a fonte de verdade para dados do servidor (queries + mutations com cache).
+- **React Hook Form + Zod** para formulários e validação declarativa.
+- Componentes de apresentação são separados de containers que lidam com dados/estado.
+
+### Segurança
+
+- Todas as rotas protegidas por `JwtAuthGuard`, exceto endpoints públicos de auth.
+- Recursos de um casal sempre filtrados por `coupleId` derivado do usuário autenticado — nunca recebido
+  diretamente do cliente.
+- Rate limiting em endpoints sensíveis (login, registro, reset de senha).
+- Senhas com hash via `bcryptjs`; tokens JWT com expiração curta.
+- Segredos apenas via variáveis de ambiente, nunca hardcoded.
+
 ## Estrutura do projeto
 
 ```
 /backend   -> API NestJS (Clean Architecture: Controller -> Service -> Repository -> Prisma)
 /frontend  -> SPA React (Vite + TailwindCSS + Shadcn UI)
 ```
+
+## Arquitetura de IA
+
+Este projeto foi desenvolvido com IA como ferramenta central de produtividade, mas com uma abordagem
+estruturada, não como "vibe coding".
+
+Toda a arquitetura do sistema, as decisões técnicas, os padrões de código, as regras de segurança e a
+organização em camadas foram definidos e projetados pelo desenvolvedor. A IA (Claude Code) atua como um
+executor dentro de um contexto cuidadosamente construído: ela recebe as regras, entende os limites de
+cada camada e implementa seguindo os padrões estabelecidos — sem autonomia para subverter a arquitetura
+ou tomar decisões de design por conta própria.
+
+Para isso, foram criados arquivos `CLAUDE.md` em três níveis do repositório, que funcionam como um
+**contrato técnico entre o desenvolvedor e o agente de IA**:
+
+| Arquivo | Escopo |
+|---|---|
+| [`CLAUDE.md`](./CLAUDE.md) | Regras gerais: TypeScript, segurança, Clean Architecture, SOLID, convenções de nomenclatura. |
+| [`backend/CLAUDE.md`](./backend/CLAUDE.md) | Padrões do NestJS: responsabilidades de cada camada, DTOs, testes, estrutura de pastas. |
+| [`frontend/CLAUDE.md`](./frontend/CLAUDE.md) | Padrões do React: design, componentização, React Query, formulários, estrutura de features. |
+
+Esses arquivos são carregados automaticamente pelo Claude Code ao iniciar uma sessão, garantindo que o
+agente opere dentro das mesmas restrições e expectativas que um desenvolvedor humano sênior seguiria no
+projeto. O resultado é uma colaboração onde a IA acelera a execução, mas as decisões de arquitetura,
+segurança e design permanecem sob controle do desenvolvedor.
 
 ## Como rodar o projeto
 
